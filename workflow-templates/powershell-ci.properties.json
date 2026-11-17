@@ -1,0 +1,6 @@
+{
+  "name": "MSP PowerShell CI",
+  "description": "Lint scripts with PSScriptAnalyzer and run Pester tests on every pull request, using the org's shared workflow.",
+  "iconName": "octicon terminal",
+  "categories": ["PowerShell"]
+}

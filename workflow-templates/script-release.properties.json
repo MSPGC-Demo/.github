@@ -1,0 +1,6 @@
+{
+  "name": "MSP script release",
+  "description": "Publish the scripts folder as a zip with a checksum whenever you push a version tag. RMMs can always pull the latest copy from one URL.",
+  "iconName": "octicon package",
+  "categories": ["PowerShell"]
+}
