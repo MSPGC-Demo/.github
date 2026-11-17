@@ -5,7 +5,7 @@ This repo holds the defaults that every repo in the MSPGC-Demo org inherits. Git
 | Path | What it does |
 | --- | --- |
 | `profile/README.md` | The public landing page at [github.com/MSPGC-Demo](https://github.com/MSPGC-Demo) |
-| `ISSUE_TEMPLATE/` | Issue forms (Bug report, Script request) offered in every repo that has none of its own |
+| `.github/ISSUE_TEMPLATE/` | Issue forms (Bug report, Script request) offered in every repo that has none of its own. Issue templates must be in this exact folder. |
 | `PULL_REQUEST_TEMPLATE.md` | The checklist that pre-fills every new pull request |
 | `CONTRIBUTING.md`, `SECURITY.md` | Policies linked from every repo's issue and PR pages |
 | `workflow-templates/` | Starter workflows listed under **Actions > New workflow** in every repo |
