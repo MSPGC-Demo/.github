@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Client is down right now
+    url: https://example.com/psa
+    about: Don't open an issue for emergencies. In a real MSP, this link would go to your PSA or on-call line.
