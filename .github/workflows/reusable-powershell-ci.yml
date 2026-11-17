@@ -1,0 +1,104 @@
+# Shared CI for PowerShell repos in this org.
+# Repos call it with a few lines (see workflow-templates/powershell-ci.yml),
+# so a change here applies to every repo on its next run.
+name: Reusable PowerShell CI
+
+on:
+  workflow_call:
+    inputs:
+      path:
+        description: Folder to lint.
+        type: string
+        default: .
+      tests-path:
+        description: Folder that holds Pester tests. Testing is skipped if it doesn't exist.
+        type: string
+        default: tests
+      fail-on:
+        description: Lowest PSScriptAnalyzer severity that fails the check (Error, Warning or Information).
+        type: string
+        default: Warning
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint (PSScriptAnalyzer)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        env:
+          SCAN_PATH: ${{ inputs.path }}
+          FAIL_ON: ${{ inputs.fail-on }}
+        run: |
+          if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+              Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          }
+
+          $params = @{ Path = $env:SCAN_PATH; Recurse = $true }
+          if (Test-Path ./PSScriptAnalyzerSettings.psd1) {
+              $params.Settings = './PSScriptAnalyzerSettings.psd1'
+          }
+          $results = @(Invoke-ScriptAnalyzer @params)
+
+          $failing = switch ($env:FAIL_ON) {
+              'Information' { 'Information', 'Warning', 'Error', 'ParseError' }
+              'Error'       { 'Error', 'ParseError' }
+              default       { 'Warning', 'Error', 'ParseError' }
+          }
+
+          # Annotations show each problem inline on the pull request's "Files changed" tab.
+          foreach ($r in $results) {
+              $file  = [IO.Path]::GetRelativePath($PWD, $r.ScriptPath)
+              $level = if ($r.Severity -in $failing) { 'error' } else { 'warning' }
+              "::$level file=$file,line=$($r.Line),col=$($r.Column),title=$($r.RuleName)::$($r.Message)"
+          }
+
+          $summary = @('## PSScriptAnalyzer', '')
+          if ($results.Count -eq 0) {
+              $summary += 'No problems found.'
+          } else {
+              $summary += '| Severity | Rule | File | Line |', '| --- | --- | --- | --- |'
+              foreach ($r in $results) {
+                  $summary += "| $($r.Severity) | $($r.RuleName) | $([IO.Path]::GetRelativePath($PWD, $r.ScriptPath)) | $($r.Line) |"
+              }
+          }
+          $summary | Out-File $env:GITHUB_STEP_SUMMARY -Append
+
+          $blocking = @($results | Where-Object Severity -in $failing)
+          if ($blocking.Count -gt 0) {
+              Write-Error "$($blocking.Count) problem(s) at or above '$($env:FAIL_ON)' severity."
+              exit 1
+          }
+
+  test:
+    name: Test (Pester)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run Pester tests
+        shell: pwsh
+        env:
+          TESTS_PATH: ${{ inputs.tests-path }}
+        run: |
+          if (-not (Test-Path $env:TESTS_PATH)) {
+              "No '$($env:TESTS_PATH)' folder found. Skipping tests."
+              exit 0
+          }
+
+          $pester = Get-Module -ListAvailable Pester | Sort-Object Version -Descending | Select-Object -First 1
+          if (-not $pester -or $pester.Version.Major -lt 5) {
+              Install-Module Pester -MinimumVersion 5.0 -Force -Scope CurrentUser -SkipPublisherCheck
+          }
+          Import-Module Pester -MinimumVersion 5.0
+
+          $config = New-PesterConfiguration
+          $config.Run.Path = $env:TESTS_PATH
+          $config.Run.Exit = $true
+          $config.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $config

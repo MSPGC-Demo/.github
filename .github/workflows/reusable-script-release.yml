@@ -1,0 +1,47 @@
+# Shared release workflow for script repos in this org.
+# Packages a folder into a zip with a SHA-256 checksum and publishes both as a GitHub release.
+# The file names stay the same on every release, so an RMM can always download:
+#   https://github.com/<org>/<repo>/releases/latest/download/<repo>.zip
+name: Reusable script release
+
+on:
+  workflow_call:
+    inputs:
+      path:
+        description: Folder to package.
+        type: string
+        default: scripts
+      package-name:
+        description: Zip file name without the extension. Defaults to the repo name.
+        type: string
+        default: ""
+
+jobs:
+  release:
+    name: Package and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Package scripts
+        shell: bash
+        env:
+          SCRIPTS_PATH: ${{ inputs.path }}
+          PACKAGE_NAME: ${{ inputs.package-name }}
+        run: |
+          name="${PACKAGE_NAME:-${GITHUB_REPOSITORY#*/}}"
+          (cd "$SCRIPTS_PATH" && zip -r "$GITHUB_WORKSPACE/$name.zip" .)
+          sha256sum "$name.zip" > "$name.zip.sha256"
+          echo "PACKAGE=$name.zip" >> "$GITHUB_ENV"
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "$PACKAGE" "$PACKAGE.sha256" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag
